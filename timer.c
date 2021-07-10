@@ -41,6 +41,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init(&sleeping_queue);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -96,16 +97,16 @@ timer_sleep (int64_t ticks)
 
   ASSERT (intr_get_level () == INTR_ON);
   //solution alarm
+   enum intr_level  old_level = 
+intr_disable ();
   if(ticks>0){
-    enum intr_level  old_level = intr_disable ();
     struct thread *current=thread_current();
     current-> total_ticks = ticks + timer_ticks ();//calculate total ticks 
     //put sleeping thread in sorted queue according to it total time tickes
     list_insert_ordered (&sleeping_queue, &current->elem,compare_totalSleep_tricks, NULL);
     thread_block ();
-    intr_set_level (old_level);
   }
-
+intr_set_level (old_level);
 
 
 }
@@ -184,6 +185,8 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
+  enum intr_level  old_level = 
+intr_disable ();
   ticks++;
   //solution to alarm
   /*
@@ -197,9 +200,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
         break;
       }
   }*/
-  struct list_elem *ele=list_begin (&sleeping_queue);
-   while (ele!=list_end(&sleeping_queue))
+  struct list_elem *ele;
+   while (!list_empty(&sleeping_queue))
     {
+      ele = list_front (&sleeping_queue);
       struct thread *t = list_entry (ele, struct thread, elem);
       if (t->total_ticks > ticks)
         {
@@ -209,6 +213,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
       thread_unblock (t);
     }  
       thread_tick ();
+      intr_set_level (old_level);
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
