@@ -103,7 +103,7 @@ intr_disable ();
     struct thread *current=thread_current();
     current-> total_ticks = ticks + timer_ticks ();//calculate total ticks 
     //put sleeping thread in sorted queue according to it total time tickes
-    list_insert_ordered (&sleeping_queue, &current->elem,compare_totalSleep_tricks, NULL);
+    list_insert_ordered (&sleeping_queue, &current->elem,compare_totalSleep_ticks, NULL);
     thread_block ();
   }
 intr_set_level (old_level);
@@ -185,22 +185,23 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  enum intr_level  old_level = 
-intr_disable ();
+  enum intr_level  old_level = intr_disable ();
   ticks++;
+  thread_tick ();
+ //advanced scheduler
+   if (thread_mlfqs)
+    {
+       incr_recent_cpu ();
+      if (ticks % TIMER_FREQ == 0)
+       set_load_avg ();
+      else if (ticks % 4 == 0)
+        mlfqs_update_priority (thread_current ());
+    }
+
+
   //solution to alarm
-  /*
   struct list_elem *ele;
-  for (ele = list_begin (&sleeping_queue); ele != list_end (&sleeping_queue); ele = list_next (ele)){
-    struct thread *t=list_entry(ele,struct thread,elem);
-      if(ticks <= t->total_ticks){
-        list_remove(ele);
-        thread_unblock(t);
-      }else{
-        break;
-      }
-  }*/
-  struct list_elem *ele;
+  bool yield = false ;
    while (!list_empty(&sleeping_queue))
     {
       ele = list_front (&sleeping_queue);
@@ -211,8 +212,10 @@ intr_disable ();
         }
       list_remove (ele);
       thread_unblock (t);
+      yield = true ; /* new thread added to ready list so interrupt handler should call thread_yield */
     }  
-      thread_tick ();
+      if ( yield )
+           intr_yield_on_return ();
       intr_set_level (old_level);
 
 }

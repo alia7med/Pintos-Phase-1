@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include "fixed_point.h"
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -23,6 +23,9 @@ typedef int tid_t;
 #define PRI_MIN 0      /* Lowest priority. */
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63     /* Highest priority. */
+/* Priority Scheduler  */
+#define DONATION_DEPTH 8 /*As stated in the pintos official document,Maximum depth of nested donation = 8 */
+
 
 /* A kernel thread or user process.
 
@@ -92,10 +95,20 @@ struct thread
 
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
-
-   //Solution for alarm
+   /*   Priority Scheduler (  Donation )       */
+   struct list locks ;  /* locks are held by this thread */
+   struct lock* waiting_lock ; /*  lock the thread is waiting on to acquire */
+   int original_priority  ; /*   original priority of this thread (always updated with thread_set_priority()) */
+   
+   /*Solution for alarm*/
    int64_t total_ticks; /* timer ticks thread should sleep + Number of timer ticks since OS booted */
 
+   /*advanced Scheduler*/
+   int nice;                           /* Niceness value to calculate priority */
+   real recent_cpu;                 /* Recent CPU value time it taks using cpu. */
+   
+   
+   // solution for donation
 #ifdef USERPROG
    /* Owned by userprog/process.c. */
    uint32_t *pagedir; /* Page directory. */
@@ -141,7 +154,25 @@ void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
-//solution to alarm
-bool compare_totalSleep_tricks(const struct list_elem *,const struct list_elem *,void *);
+/** solution to alarm **/
+bool compare_totalSleep_ticks(const struct list_elem *,const struct list_elem *,void *);
+/*******************************************************/             
+/**   Priority Scheduling   **/
+bool compare_thread_priority(const struct list_elem *,const struct list_elem *,void *);
+void preempt (void);
+// locks
+bool compare_lock_priority(const struct list_elem *,const struct list_elem *,void *);
+void add_lock (struct lock *);
+void remove_lock (struct lock *);
+// priority
+void update(struct thread * );
+void donate(struct thread *);
+/***********************************************************/
+/*advanced Scheduler*/
+void incr_recent_cpu(void);
+void Calculate_recent_cpu(struct thread *);
+void mlfqs_update_priority(struct thread *);
+void set_load_avg(void);
 
+/*******************************************************/
 #endif /* threads/thread.h */
