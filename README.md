@@ -1,4 +1,4 @@
 # Pintos-Phase-1
 # Contributers:
- ### https://github.com/faressalm
- ###  
+ ### 1.@alia7med 
+ ### 2.@faressalm
